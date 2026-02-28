@@ -148,7 +148,15 @@ struct InboxMessageDetailSheet: View {
 
 #Preview("InboxMessageDetailSheet") {
     InboxMessageDetailSheet(
-        message: MockInboxService.sampleMessages[0],
+        message: InboxMessage(
+            platform: .iMessage,
+            senderName: "Lindsay",
+            senderIdentifier: "+15551234567",
+            content: "Hey, can you review the Q3 budget deck before the 3pm meeting? Need your sign-off.",
+            conversationContext: "Direct Message",
+            triage: TriageResult(urgency: .urgent, reasoning: "From your manager, time-sensitive request before upcoming meeting"),
+            originalMessageID: "imsg-001"
+        ),
         onMarkAsRead: {}
     )
 }

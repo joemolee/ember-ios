@@ -96,12 +96,34 @@ struct InboxScreen: View {
 // MARK: - Preview
 
 #Preview("InboxScreen — With Messages") {
-    let appState = AppState()
-    appState.settings.selectedProvider = .openClaw
-    appState.settings.inboxEnabled = true
-    appState.inboxMessages = MockInboxService.sampleMessages
+    @Previewable @State var appState: AppState = {
+        let state = AppState()
+        state.settings.selectedProvider = .openClaw
+        state.settings.inboxEnabled = true
+        state.inboxMessages = [
+            InboxMessage(
+                platform: .iMessage,
+                senderName: "Lindsay",
+                senderIdentifier: "+15551234567",
+                content: "Hey, can you review the Q3 budget deck before the 3pm meeting?",
+                conversationContext: "Direct Message",
+                triage: TriageResult(urgency: .urgent, reasoning: "From your manager"),
+                originalMessageID: "imsg-001"
+            ),
+            InboxMessage(
+                platform: .slack,
+                senderName: "Daniel Henderson",
+                senderIdentifier: "U12345",
+                content: "The staging deploy is blocked on a failing integration test.",
+                conversationContext: "#engineering",
+                triage: TriageResult(urgency: .important, reasoning: "Deployment blocked"),
+                originalMessageID: "slack-001"
+            ),
+        ]
+        return state
+    }()
 
-    return NavigationStack {
+    NavigationStack {
         InboxScreen(appState: appState)
     }
     .environment(appState)
@@ -109,11 +131,14 @@ struct InboxScreen: View {
 }
 
 #Preview("InboxScreen — Empty") {
-    let appState = AppState()
-    appState.settings.selectedProvider = .openClaw
-    appState.settings.inboxEnabled = true
+    @Previewable @State var appState: AppState = {
+        let state = AppState()
+        state.settings.selectedProvider = .openClaw
+        state.settings.inboxEnabled = true
+        return state
+    }()
 
-    return NavigationStack {
+    NavigationStack {
         InboxScreen(appState: appState)
     }
     .environment(appState)
@@ -121,9 +146,9 @@ struct InboxScreen: View {
 }
 
 #Preview("InboxScreen — Disabled") {
-    let appState = AppState()
+    @Previewable @State var appState = AppState()
 
-    return NavigationStack {
+    NavigationStack {
         InboxScreen(appState: appState)
     }
     .environment(appState)

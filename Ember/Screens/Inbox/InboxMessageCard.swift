@@ -75,13 +75,28 @@ struct InboxMessageCard: View {
 // MARK: - Preview
 
 #Preview("InboxMessageCard") {
-    let sample = MockInboxService.sampleMessages
-
     ScrollView {
         VStack(spacing: EmberTheme.Spacing.sm) {
-            ForEach(sample) { message in
-                InboxMessageCard(message: message) {}
-            }
+            InboxMessageCard(message: InboxMessage(
+                platform: .iMessage,
+                senderName: "Lindsay",
+                senderIdentifier: "+15551234567",
+                content: "Hey, can you review the Q3 budget deck before the 3pm meeting?",
+                conversationContext: "Direct Message",
+                triage: TriageResult(urgency: .urgent, reasoning: "From your manager"),
+                originalMessageID: "imsg-001"
+            )) {}
+
+            InboxMessageCard(message: InboxMessage(
+                platform: .slack,
+                senderName: "Daniel Henderson",
+                senderIdentifier: "U12345",
+                content: "The staging deploy is blocked on a failing integration test.",
+                conversationContext: "#engineering",
+                triage: TriageResult(urgency: .important, reasoning: "Deployment blocked"),
+                isRead: true,
+                originalMessageID: "slack-001"
+            )) {}
         }
         .padding(EmberTheme.Spacing.md)
     }

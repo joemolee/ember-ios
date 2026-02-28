@@ -136,17 +136,25 @@ struct EmberApp: App {
 // MARK: - EnvironmentValues
 
 /// Makes AppState available to any view in the hierarchy via @Environment.
+private struct AppStateKey: EnvironmentKey {
+    @MainActor static let defaultValue = AppState()
+}
+
 extension EnvironmentValues {
-    @Entry var appState: AppState = AppState()
+    var appState: AppState {
+        get { self[AppStateKey.self] }
+        set { self[AppStateKey.self] = newValue }
+    }
 }
 
 // MARK: - Previews
 
 #Preview("EmberApp - Main") {
-    let state = AppState()
-    state.settings.hasCompletedOnboarding = true
+    @Previewable @State var state = AppState()
 
-    return NavigationStack {
+    let _ = { state.settings.hasCompletedOnboarding = true }()
+
+    NavigationStack {
         ConversationListScreen(
             conversations: .constant([
                 Conversation(
@@ -175,10 +183,9 @@ extension EnvironmentValues {
 }
 
 #Preview("EmberApp - Onboarding") {
-    let state = AppState()
-    state.settings.hasCompletedOnboarding = false
+    @Previewable @State var state = AppState()
 
-    return OnboardingScreen(settings: state.settings) { }
+    OnboardingScreen(settings: state.settings) { }
         .environment(state)
         .preferredColorScheme(.dark)
 }
