@@ -86,6 +86,18 @@ struct EmberApp: App {
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if appState.settings.selectedProvider == .openClaw {
+                        // Memory button
+                        if appState.settings.memoryEnabled {
+                            Button {
+                                appState.router.navigate(to: .memory)
+                            } label: {
+                                Image(systemName: "brain.head.profile")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(Color.ember.primary)
+                            }
+                            .accessibilityLabel("Memories")
+                        }
+
                         // Briefing button
                         if appState.settings.briefingEnabled, appState.latestBriefing != nil {
                             Button {
