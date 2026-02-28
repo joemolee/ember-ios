@@ -10,6 +10,7 @@ struct EmberApp: App {
     // MARK: - State
 
     @State private var appState = AppState()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     // MARK: - Scene
 
@@ -29,6 +30,7 @@ struct EmberApp: App {
             .environment(appState)
             .preferredColorScheme(.dark)
             .onAppear {
+                configureAppDelegate()
                 appState.startInboxIfNeeded()
             }
             .onReceive(
@@ -37,6 +39,13 @@ struct EmberApp: App {
                 )
             ) { _ in
                 appState.saveCurrentState()
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: .navigateFromNotification
+                )
+            ) { notification in
+                handleNotificationNavigation(notification)
             }
         }
     }
@@ -75,17 +84,32 @@ struct EmberApp: App {
                     .accessibilityLabel("Settings")
                 }
 
-                if appState.settings.inboxEnabled && appState.settings.selectedProvider == .openClaw {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            appState.router.navigate(to: .inbox)
-                        } label: {
-                            Image(systemName: "tray.fill")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(Color.ember.primary)
-                                .emberBadge(count: appState.unreadUrgentCount)
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if appState.settings.selectedProvider == .openClaw {
+                        // Briefing button
+                        if appState.settings.briefingEnabled, appState.latestBriefing != nil {
+                            Button {
+                                appState.router.navigate(to: .briefing)
+                            } label: {
+                                Image(systemName: "sun.horizon.fill")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(Color.ember.glow)
+                            }
+                            .accessibilityLabel("Morning Briefing")
                         }
-                        .accessibilityLabel("Inbox")
+
+                        // Inbox button
+                        if appState.settings.inboxEnabled {
+                            Button {
+                                appState.router.navigate(to: .inbox)
+                            } label: {
+                                Image(systemName: "tray.fill")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(Color.ember.primary)
+                                    .emberBadge(count: appState.unreadUrgentCount)
+                            }
+                            .accessibilityLabel("Inbox")
+                        }
                     }
                 }
             }
@@ -98,11 +122,16 @@ struct EmberApp: App {
                         .onDisappear {
                             appState.syncSettings()
                             appState.startInboxIfNeeded()
+                            appState.sendBriefingConfig()
                         }
                 case .newChat:
                     chatDestination(for: appState.createNewConversation())
                 case .inbox:
                     InboxScreen(appState: appState)
+                case .memory:
+                    MemoryScreen(appState: appState)
+                case .briefing:
+                    BriefingScreen(appState: appState)
                 }
             }
         }
@@ -129,6 +158,42 @@ struct EmberApp: App {
             if let active = appState.activeConversation {
                 appState.updateConversation(active)
             }
+        }
+    }
+
+    // MARK: - AppDelegate Configuration
+
+    /// Wires the AppDelegate callbacks to AppState.
+    private func configureAppDelegate() {
+        appDelegate.onDeviceToken = { [weak appState] token in
+            Task { @MainActor in
+                appState?.registerDeviceToken(token)
+            }
+        }
+
+        appDelegate.onNotificationTap = { [weak appState] destination in
+            Task { @MainActor in
+                guard let appState else { return }
+                switch destination {
+                case "briefing":
+                    appState.router.navigate(to: .briefing)
+                default:
+                    appState.router.navigate(to: .inbox)
+                }
+            }
+        }
+    }
+
+    // MARK: - Notification Navigation
+
+    /// Handles deep-linking from notification taps.
+    private func handleNotificationNavigation(_ notification: Foundation.Notification) {
+        guard let destination = notification.userInfo?["destination"] as? String else { return }
+        switch destination {
+        case "briefing":
+            appState.router.navigate(to: .briefing)
+        default:
+            appState.router.navigate(to: .inbox)
         }
     }
 }

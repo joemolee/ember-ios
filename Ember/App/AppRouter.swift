@@ -19,6 +19,8 @@ final class AppRouter {
         case settings
         case newChat
         case inbox
+        case memory
+        case briefing
 
         // Conversation is Equatable but not Hashable by default.
         // Provide explicit Hashable conformance by hashing the discriminator
@@ -34,6 +36,10 @@ final class AppRouter {
                 hasher.combine(2)
             case .inbox:
                 hasher.combine(3)
+            case .memory:
+                hasher.combine(4)
+            case .briefing:
+                hasher.combine(5)
             }
         }
 
@@ -46,6 +52,10 @@ final class AppRouter {
             case (.newChat, .newChat):
                 return true
             case (.inbox, .inbox):
+                return true
+            case (.memory, .memory):
+                return true
+            case (.briefing, .briefing):
                 return true
             default:
                 return false

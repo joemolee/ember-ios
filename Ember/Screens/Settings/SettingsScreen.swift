@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - SettingsScreen
 
 /// The main settings screen with sections for AI provider selection,
-/// API configuration, appearance preferences, and app information.
+/// API configuration, notifications, memory, briefing, appearance, and app information.
 struct SettingsScreen: View {
 
     // MARK: - Properties
@@ -23,6 +23,9 @@ struct SettingsScreen: View {
                 apiConfigurationSection
                 if settings.selectedProvider == .openClaw {
                     inboxSection
+                    notificationsSection
+                    memorySection
+                    briefingSection
                 }
                 appearanceSection
                 aboutSection
@@ -112,6 +115,164 @@ struct SettingsScreen: View {
 
             InboxSettingsView(settings: settings)
         }
+    }
+
+    // MARK: - Notifications Section
+
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: EmberTheme.Spacing.sm) {
+            sectionHeader("Notifications")
+
+            EmberCard {
+                VStack(alignment: .leading, spacing: EmberTheme.Spacing.md) {
+                    Toggle(isOn: $settings.notificationsEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Push Notifications")
+                                .font(EmberTheme.Typography.body)
+                                .foregroundStyle(Color.ember.textPrimary)
+
+                            Text("Get notified of urgent messages and morning briefings")
+                                .font(EmberTheme.Typography.caption)
+                                .foregroundStyle(Color.ember.textSecondary)
+                        }
+                    }
+                    .tint(Color.ember.primary)
+
+                    if settings.notificationsEnabled {
+                        Button {
+                            Task {
+                                let granted = await NotificationService().requestPermission()
+                                if granted {
+                                    await UIApplication.shared.registerForRemoteNotifications()
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "bell.badge.fill")
+                                Text("Request Permission")
+                            }
+                            .font(EmberTheme.Typography.body)
+                            .foregroundStyle(Color.ember.primary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Memory Section
+
+    private var memorySection: some View {
+        VStack(alignment: .leading, spacing: EmberTheme.Spacing.sm) {
+            sectionHeader("Memory")
+
+            MemorySettingsView(settings: settings)
+        }
+    }
+
+    // MARK: - Briefing Section
+
+    private var briefingSection: some View {
+        VStack(alignment: .leading, spacing: EmberTheme.Spacing.sm) {
+            sectionHeader("Morning Briefing")
+
+            EmberCard {
+                VStack(alignment: .leading, spacing: EmberTheme.Spacing.md) {
+                    Toggle(isOn: $settings.briefingEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Enable Morning Briefing")
+                                .font(EmberTheme.Typography.body)
+                                .foregroundStyle(Color.ember.textPrimary)
+
+                            Text("Receive a daily summary of your messages and action items")
+                                .font(EmberTheme.Typography.caption)
+                                .foregroundStyle(Color.ember.textSecondary)
+                        }
+                    }
+                    .tint(Color.ember.primary)
+
+                    if settings.briefingEnabled {
+                        Divider()
+                            .background(Color.ember.textSecondary.opacity(0.2))
+
+                        // Time picker
+                        briefingTimePicker
+
+                        Divider()
+                            .background(Color.ember.textSecondary.opacity(0.2))
+
+                        // Source toggles
+                        VStack(alignment: .leading, spacing: EmberTheme.Spacing.sm) {
+                            Text("SOURCES")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.ember.textSecondary)
+
+                            ForEach(MessagePlatform.allCases) { platform in
+                                Toggle(isOn: briefingSourceBinding(for: platform)) {
+                                    Text(platform.displayName)
+                                        .font(EmberTheme.Typography.body)
+                                        .foregroundStyle(Color.ember.textPrimary)
+                                }
+                                .tint(Color.ember.primary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Briefing Time Picker
+
+    private var briefingTimePicker: some View {
+        HStack {
+            Text("Delivery Time")
+                .font(EmberTheme.Typography.body)
+                .foregroundStyle(Color.ember.textPrimary)
+
+            Spacer()
+
+            DatePicker(
+                "",
+                selection: briefingTimeBinding,
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .tint(Color.ember.primary)
+        }
+    }
+
+    /// Converts between the `"HH:mm"` string in settings and a `Date` for the DatePicker.
+    private var briefingTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let components = settings.briefingTime.split(separator: ":").compactMap { Int($0) }
+                guard components.count == 2 else {
+                    return Calendar.current.date(from: DateComponents(hour: 7, minute: 0)) ?? Date()
+                }
+                return Calendar.current.date(from: DateComponents(hour: components[0], minute: components[1])) ?? Date()
+            },
+            set: { newDate in
+                let calendar = Calendar.current
+                let hour = calendar.component(.hour, from: newDate)
+                let minute = calendar.component(.minute, from: newDate)
+                settings.briefingTime = String(format: "%02d:%02d", hour, minute)
+                settings.briefingTimezone = TimeZone.current.identifier
+            }
+        )
+    }
+
+    private func briefingSourceBinding(for platform: MessagePlatform) -> Binding<Bool> {
+        Binding(
+            get: { settings.briefingSources.contains(platform) },
+            set: { enabled in
+                if enabled {
+                    settings.briefingSources.insert(platform)
+                } else {
+                    settings.briefingSources.remove(platform)
+                }
+            }
+        )
     }
 
     // MARK: - Appearance Section

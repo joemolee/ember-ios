@@ -2,15 +2,16 @@ import Foundation
 
 // MARK: - InboxService
 
-/// WebSocket client that connects to the OpenClaw Gateway for inbox message triage.
-/// Maintains its own connection, independent of `OpenClawService`, so the inbox
-/// subscription stays alive regardless of which AI chat provider is selected.
+/// WebSocket client that connects to the OpenClaw Gateway for inbox message triage,
+/// memory sync, briefing delivery, and push notification registration.
+/// Maintains its own connection, independent of `OpenClawService`, so the subscription
+/// stays alive regardless of which AI chat provider is selected.
 ///
 /// Protocol flow:
-///   1. Connect to the Gateway and send `register` with `["inbox"]` capability.
+///   1. Connect to the Gateway and send `register` with capabilities.
 ///   2. Send `inbox_subscribe` to start receiving triaged messages.
-///   3. Receive `inbox_messages` (batch) and `inbox_update` (single) events.
-///   4. Optionally send `inbox_refresh`, `inbox_read`, `inbox_config` commands.
+///   3. Receive events for inbox, memory, briefing, and push confirmation.
+///   4. Optionally send commands for refresh, read, config, memory, briefing, and device token.
 final class InboxService: InboxServiceProtocol, @unchecked Sendable {
 
     // MARK: - Configuration
@@ -52,12 +53,12 @@ final class InboxService: InboxServiceProtocol, @unchecked Sendable {
         let task = session.webSocketTask(with: url)
         task.resume()
 
-        // Registration handshake.
+        // Registration handshake with expanded capabilities.
         let registerPayload: [String: Any] = [
             "type": "register",
             "client": "ember-ios",
             "version": "1.0",
-            "capabilities": ["inbox"]
+            "capabilities": ["inbox", "memory", "briefing", "push"]
         ]
         let data = try JSONSerialization.data(withJSONObject: registerPayload)
         try await task.send(.string(String(data: data, encoding: .utf8) ?? "{}"))
@@ -103,7 +104,7 @@ final class InboxService: InboxServiceProtocol, @unchecked Sendable {
 
     // MARK: - InboxServiceProtocol
 
-    func subscribe() -> AsyncThrowingStream<InboxEvent, Error> {
+    func subscribe() -> AsyncThrowingStream<GatewayEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
                 guard let self else {
@@ -162,6 +163,7 @@ final class InboxService: InboxServiceProtocol, @unchecked Sendable {
                         let messageType = json["type"] as? String ?? ""
 
                         switch messageType {
+                        // Inbox events
                         case "inbox_messages":
                             if let messagesJSON = json["messages"],
                                let messagesData = try? JSONSerialization.data(withJSONObject: messagesJSON) {
@@ -186,6 +188,57 @@ final class InboxService: InboxServiceProtocol, @unchecked Sendable {
                             if let messageID = json["messageId"] as? String {
                                 continuation.yield(.readConfirmed(messageID: messageID))
                             }
+
+                        // Memory events
+                        case "memory_list":
+                            if let memoriesJSON = json["memories"],
+                               let memoriesData = try? JSONSerialization.data(withJSONObject: memoriesJSON) {
+                                let decoder = JSONDecoder()
+                                decoder.dateDecodingStrategy = .iso8601
+                                if let memories = try? decoder.decode([Memory].self, from: memoriesData) {
+                                    continuation.yield(.memoryList(memories))
+                                }
+                            }
+
+                        case "memory_created":
+                            if let memoryJSON = json["memory"],
+                               let memoryData = try? JSONSerialization.data(withJSONObject: memoryJSON) {
+                                let decoder = JSONDecoder()
+                                decoder.dateDecodingStrategy = .iso8601
+                                if let memory = try? decoder.decode(Memory.self, from: memoryData) {
+                                    continuation.yield(.memoryCreated(memory))
+                                }
+                            }
+
+                        case "memory_updated":
+                            if let memoryJSON = json["memory"],
+                               let memoryData = try? JSONSerialization.data(withJSONObject: memoryJSON) {
+                                let decoder = JSONDecoder()
+                                decoder.dateDecodingStrategy = .iso8601
+                                if let memory = try? decoder.decode(Memory.self, from: memoryData) {
+                                    continuation.yield(.memoryUpdated(memory))
+                                }
+                            }
+
+                        case "memory_deleted":
+                            if let memoryId = json["memoryId"] as? String {
+                                continuation.yield(.memoryDeleted(memoryId: memoryId))
+                            }
+
+                        // Briefing events
+                        case "briefing":
+                            if let briefingJSON = json["briefing"],
+                               let briefingData = try? JSONSerialization.data(withJSONObject: briefingJSON) {
+                                let decoder = JSONDecoder()
+                                decoder.dateDecodingStrategy = .iso8601
+                                if let briefing = try? decoder.decode(Briefing.self, from: briefingData) {
+                                    continuation.yield(.briefing(briefing))
+                                }
+                            }
+
+                        // Push events
+                        case "device_token_confirmed":
+                            continuation.yield(.deviceTokenConfirmed)
 
                         case "pong", "registered", "ack":
                             continue
@@ -253,6 +306,51 @@ final class InboxService: InboxServiceProtocol, @unchecked Sendable {
             "type": "inbox_config",
             "vips": vips,
             "topics": topics
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try await wsTask.send(.string(String(data: data, encoding: .utf8) ?? "{}"))
+    }
+
+    func sendDeviceToken(_ token: String) async throws {
+        guard let wsTask = lockedWebSocketTask() else {
+            throw InboxServiceError.connectionFailed
+        }
+        let payload: [String: Any] = [
+            "type": "device_token",
+            "token": token,
+            "platform": "ios"
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try await wsTask.send(.string(String(data: data, encoding: .utf8) ?? "{}"))
+    }
+
+    func requestMemorySync() async throws {
+        guard let wsTask = lockedWebSocketTask() else {
+            throw InboxServiceError.connectionFailed
+        }
+        let payload = try JSONSerialization.data(withJSONObject: ["type": "memory_sync"])
+        try await wsTask.send(.string(String(data: payload, encoding: .utf8) ?? "{}"))
+    }
+
+    func deleteMemory(id: String) async throws {
+        guard let wsTask = lockedWebSocketTask() else {
+            throw InboxServiceError.connectionFailed
+        }
+        let payload: [String: Any] = ["type": "memory_delete", "memoryId": id]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try await wsTask.send(.string(String(data: data, encoding: .utf8) ?? "{}"))
+    }
+
+    func sendBriefingConfig(enabled: Bool, time: String, timezone: String, sources: [String]) async throws {
+        guard let wsTask = lockedWebSocketTask() else {
+            throw InboxServiceError.connectionFailed
+        }
+        let payload: [String: Any] = [
+            "type": "briefing_config",
+            "enabled": enabled,
+            "time": time,
+            "timezone": timezone,
+            "sources": sources
         ]
         let data = try JSONSerialization.data(withJSONObject: payload)
         try await wsTask.send(.string(String(data: data, encoding: .utf8) ?? "{}"))

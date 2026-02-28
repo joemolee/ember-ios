@@ -15,13 +15,17 @@ final class MockInboxService: InboxServiceProtocol, @unchecked Sendable {
     var sentVIPs: [String] = []
     var sentTopics: [String] = []
     var unsubscribeCallCount = 0
+    var sentDeviceToken: String?
+    var memorySyncCallCount = 0
+    var deletedMemoryIDs: [String] = []
+    var sentBriefingConfig: (enabled: Bool, time: String, timezone: String, sources: [String])?
 
     /// Override to inject custom events into the stream.
-    var eventsToEmit: [InboxEvent] = [.messages(MockInboxService.sampleMessages)]
+    var eventsToEmit: [GatewayEvent] = [.messages(MockInboxService.sampleMessages)]
 
     // MARK: - InboxServiceProtocol
 
-    func subscribe() -> AsyncThrowingStream<InboxEvent, Error> {
+    func subscribe() -> AsyncThrowingStream<GatewayEvent, Error> {
         subscribeCallCount += 1
         let events = eventsToEmit
         return AsyncThrowingStream { continuation in
@@ -43,6 +47,22 @@ final class MockInboxService: InboxServiceProtocol, @unchecked Sendable {
     func sendConfig(vips: [String], topics: [String]) async throws {
         sentVIPs = vips
         sentTopics = topics
+    }
+
+    func sendDeviceToken(_ token: String) async throws {
+        sentDeviceToken = token
+    }
+
+    func requestMemorySync() async throws {
+        memorySyncCallCount += 1
+    }
+
+    func deleteMemory(id: String) async throws {
+        deletedMemoryIDs.append(id)
+    }
+
+    func sendBriefingConfig(enabled: Bool, time: String, timezone: String, sources: [String]) async throws {
+        sentBriefingConfig = (enabled: enabled, time: time, timezone: timezone, sources: sources)
     }
 
     func unsubscribe() {
@@ -91,6 +111,27 @@ final class MockInboxService: InboxServiceProtocol, @unchecked Sendable {
             conversationContext: "#ci-notifications",
             triage: TriageResult(urgency: .low, reasoning: "Automated notification, routine dependency update"),
             originalMessageID: "slack-002"
+        ),
+    ]
+
+    static let sampleMemories: [Memory] = [
+        Memory(
+            id: "mem-001",
+            category: .preference,
+            content: "Prefers concise, bullet-point summaries over long paragraphs",
+            source: .conversation
+        ),
+        Memory(
+            id: "mem-002",
+            category: .fact,
+            content: "Works at Incendo AI as a product manager",
+            source: .conversation
+        ),
+        Memory(
+            id: "mem-003",
+            category: .correction,
+            content: "Name is spelled 'Lindsay' not 'Lindsey'",
+            source: .conversation
         ),
     ]
 }
