@@ -17,27 +17,25 @@ struct SettingsScreen: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: EmberTheme.Spacing.lg) {
-                    aiProviderSection
-                    apiConfigurationSection
-                    if settings.selectedProvider == .openClaw {
-                        inboxSection
-                    }
-                    appearanceSection
-                    aboutSection
+        ScrollView {
+            VStack(spacing: EmberTheme.Spacing.lg) {
+                aiProviderSection
+                apiConfigurationSection
+                if settings.selectedProvider == .openClaw {
+                    inboxSection
                 }
-                .padding(.horizontal, EmberTheme.Spacing.md)
-                .padding(.vertical, EmberTheme.Spacing.lg)
+                appearanceSection
+                aboutSection
             }
-            .background(Color.ember.background)
-            .scrollContentBackground(.hidden)
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color.ember.surface, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .padding(.horizontal, EmberTheme.Spacing.md)
+            .padding(.vertical, EmberTheme.Spacing.lg)
         }
+        .background(Color.ember.background)
+        .scrollContentBackground(.hidden)
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(Color.ember.surface, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             gatewayURLInput = settings.gatewayURL
         }
