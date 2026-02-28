@@ -181,7 +181,7 @@ struct BriefingScreen: View {
                         }
                         .padding(EmberTheme.Spacing.sm)
                         .background(Color.ember.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: EmberTheme.CornerRadius.medium))
+                        .clipShape(RoundedRectangle(cornerRadius: EmberTheme.Radii.medium))
                     }
                 }
             }

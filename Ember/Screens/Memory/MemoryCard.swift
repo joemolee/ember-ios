@@ -15,7 +15,7 @@ struct MemoryCard: View {
                 .foregroundStyle(categoryColor)
                 .frame(width: 32, height: 32)
                 .background(categoryColor.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: EmberTheme.CornerRadius.small))
+                .clipShape(RoundedRectangle(cornerRadius: EmberTheme.Radii.small))
 
             VStack(alignment: .leading, spacing: EmberTheme.Spacing.xs) {
                 // Category label
@@ -39,7 +39,7 @@ struct MemoryCard: View {
         }
         .padding(EmberTheme.Spacing.sm)
         .background(Color.ember.surface)
-        .clipShape(RoundedRectangle(cornerRadius: EmberTheme.CornerRadius.medium))
+        .clipShape(RoundedRectangle(cornerRadius: EmberTheme.Radii.medium))
         .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
     }
 
